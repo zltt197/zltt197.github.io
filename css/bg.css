@@ -1,0 +1,15 @@
+body{
+    background-image: var(--bg-l);
+}
+
+[data-user-color-scheme='dark'] body {
+  color: var(--hty-text-color);
+  background-image: var(--bg-d);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-user-color-scheme]) body {
+    color: var(--hty-text-color);
+    background-image: var(--bg-d);
+  }
+}
